@@ -23,8 +23,8 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({ 
-  origin: 'http://localhost:5173', // Apnar React/Vite app er exact port
-  credentials: true // HTTP-Only Cookie er jonno eta mandatory
+  origin: process.env.CLIENT_URL, 
+  credentials: true 
 }));
 
 // Modern Database Connection (Mongoose 8+ Standard)
