@@ -1,8 +1,8 @@
 import Order from "../models/Order.js";
 
-// @desc    Create new order
+// @desc    Create new order (Supports both Logged-in & Guest users)
 // @route   POST /api/orders
-// @access  Private (Logged in user lagbe)
+// @access  Public (Optional Auth)
 export const addOrderItems = async (req, res) => {
   try {
     const {
@@ -14,13 +14,14 @@ export const addOrderItems = async (req, res) => {
       totalPrice,
     } = req.body;
 
-    if (orderItems && orderItems.length === 0) {
+    if (!orderItems || orderItems.length === 0) {
       return res.status(400).json({ message: 'No order items' });
     }
 
     const order = new Order({
       orderItems,
-      user: req.user._id, // Auth middleware theke asbe
+      // লগইন করা থাকলে user ID নেবে, আর গেস্ট হলে null সেট করবে
+      user: req.user ? req.user._id : null, 
       shippingAddress,
       paymentMethod,
       itemsPrice,
@@ -40,7 +41,6 @@ export const addOrderItems = async (req, res) => {
 // @access  Private
 export const getMyOrders = async (req, res) => {
   try {
-    // Current user er id diye order khuje ber kora
     const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (error) {
@@ -53,8 +53,10 @@ export const getMyOrders = async (req, res) => {
 // @access  Private/Admin
 export const getOrders = async (req, res) => {
   try {
-    // Populate diye order er sathe user er nam o email o niye asbo
-    const orders = await Order.find({}).populate('user', 'id name email');
+    // Populate diye order er sathe user er nam o email niye asbo (Guest hole user null thakbe)
+    const orders = await Order.find({})
+      .populate('user', 'id name email')
+      .sort({ createdAt: -1 });
     res.json(orders);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -71,7 +73,6 @@ export const updateOrderStatus = async (req, res) => {
     if (order) {
       order.status = req.body.status || order.status;
 
-      // Jodi status Delivered hoy, tahole isDelivered true kore time set kore dibo
       if (req.body.status === 'Delivered') {
         order.isDelivered = true;
         order.deliveredAt = Date.now();

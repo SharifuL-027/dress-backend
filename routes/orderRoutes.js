@@ -5,13 +5,14 @@ import {
   getOrders, 
   updateOrderStatus 
 } from '../controllers/orderController.js';
-import { protect, admin } from '../middleware/authMiddleware.js';
+import { protect, admin, optionalProtect } from '../middleware/authMiddleware.js'; // optionalProtect import kora holo
 
 const router = express.Router();
 
-// GET request e shob order pabe (shudhu admin), POST e order toiri hobe
+// POST e optionalProtect dewa hoyeche jate guest ebong logged-in user ubhoyi order korte pare
+// GET request e shob order pabe (shudhu admin)
 router.route('/')
-  .post(protect, addOrderItems)
+  .post(optionalProtect, addOrderItems)
   .get(protect, admin, getOrders);
 
 router.route('/myorders').get(protect, getMyOrders);

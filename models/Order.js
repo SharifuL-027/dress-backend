@@ -1,7 +1,12 @@
 import mongoose from 'mongoose';
 
 const orderSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' }, // Je order korche
+  user: { 
+  type: mongoose.Schema.Types.ObjectId, 
+  required: false, 
+  ref: 'User',
+  default: null 
+},
   
   orderItems: [
     {
