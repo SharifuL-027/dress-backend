@@ -1,6 +1,7 @@
 import Order from "../models/Order.js";
+import Product from "../models/Product.js"; // Product মডেল ইমপোর্ট করা হলো
 
-// @desc    Create new order (Supports both Logged-in & Guest users)
+// @desc    Create new order & reduce product stock
 // @route   POST /api/orders
 // @access  Public (Optional Auth)
 export const addOrderItems = async (req, res) => {
@@ -18,10 +19,10 @@ export const addOrderItems = async (req, res) => {
       return res.status(400).json({ message: 'No order items' });
     }
 
+    // ১. অর্ডার তৈরি ও সেভ করা
     const order = new Order({
       orderItems,
-      // লগইন করা থাকলে user ID নেবে, আর গেস্ট হলে null সেট করবে
-      user: req.user ? req.user._id : null, 
+      user: req.user ? req.user._id : null,
       shippingAddress,
       paymentMethod,
       itemsPrice,
@@ -30,6 +31,40 @@ export const addOrderItems = async (req, res) => {
     });
 
     const createdOrder = await order.save();
+
+    // ২. অর্ডারকৃত প্রতিটি প্রোডাক্টের ভ্যারিয়েন্ট স্টক এবং টোটাল স্টক কমানো
+    for (const item of orderItems) {
+      const product = await Product.findById(item.product);
+      if (product) {
+        // যদি ভ্যারিয়েন্ট থাকে তবে কালার ও সাইজ মিলিয়ে স্টক কমানো
+        if (product.variants && product.variants.length > 0) {
+          const variantIndex = product.variants.findIndex(
+            (v) =>
+              v.color.trim().toLowerCase() === String(item.color).trim().toLowerCase() &&
+              v.size.trim().toLowerCase() === String(item.size).trim().toLowerCase()
+          );
+
+          if (variantIndex !== -1) {
+            product.variants[variantIndex].stock = Math.max(
+              0,
+              product.variants[variantIndex].stock - Number(item.qty)
+            );
+          }
+
+          // সব ভ্যারিয়েন্টের স্টক যোগ করে নতুন totalStock আপডেট করা
+          product.totalStock = product.variants.reduce(
+            (acc, curr) => acc + Number(curr.stock || 0),
+            0
+          );
+        } else if (typeof product.totalStock === "number") {
+          // যদি ভ্যারিয়েন্ট ছাড়া প্রোডাক্ট হয় তবে সরাসরি totalStock কমানো
+          product.totalStock = Math.max(0, product.totalStock - Number(item.qty));
+        }
+
+        await product.save();
+      }
+    }
+
     res.status(201).json(createdOrder);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -53,7 +88,6 @@ export const getMyOrders = async (req, res) => {
 // @access  Private/Admin
 export const getOrders = async (req, res) => {
   try {
-    // Populate diye order er sathe user er nam o email niye asbo (Guest hole user null thakbe)
     const orders = await Order.find({})
       .populate('user', 'id name email')
       .sort({ createdAt: -1 });
@@ -63,19 +97,52 @@ export const getOrders = async (req, res) => {
   }
 };
 
-// @desc    Update order status to Shipped/Delivered
-// @route   PUT /api/orders/:id/status
-// @access  Private/Admin
 export const updateOrderStatus = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
 
     if (order) {
-      order.status = req.body.status || order.status;
+      const previousStatus = order.status;
+      const newStatus = req.body.status || order.status;
+      order.status = newStatus;
 
-      if (req.body.status === 'Delivered') {
+      // অগ্রিম টাকা (Advance Paid) আপডেট করার লজিক
+      if (req.body.advancePaid !== undefined) {
+        order.advancePaid = Math.max(0, Number(req.body.advancePaid));
+        // যদি পুরো টাকাই পরিশোধ হয়ে যায় তবে অটোমেটিক Paid মার্ক হবে
+        if (order.advancePaid >= order.totalPrice) {
+          order.isPaid = true;
+          order.paidAt = order.paidAt || Date.now();
+        }
+      }
+
+      if (newStatus === 'Delivered') {
         order.isDelivered = true;
         order.deliveredAt = Date.now();
+      }
+
+      // যদি অ্যাডমিন অর্ডারটি Cancelled করে, তবে স্টক আবার ফেরত যোগ হবে
+      if (newStatus === 'Cancelled' && previousStatus !== 'Cancelled') {
+        for (const item of order.orderItems) {
+          const product = await Product.findById(item.product);
+          if (product && product.variants && product.variants.length > 0) {
+            const variantIndex = product.variants.findIndex(
+              (v) =>
+                v.color.trim().toLowerCase() === String(item.color).trim().toLowerCase() &&
+                v.size.trim().toLowerCase() === String(item.size).trim().toLowerCase()
+            );
+
+            if (variantIndex !== -1) {
+              product.variants[variantIndex].stock += Number(item.qty);
+            }
+
+            product.totalStock = product.variants.reduce(
+              (acc, curr) => acc + Number(curr.stock || 0),
+              0
+            );
+            await product.save();
+          }
+        }
       }
 
       const updatedOrder = await order.save();
@@ -88,9 +155,6 @@ export const updateOrderStatus = async (req, res) => {
   }
 };
 
-// @desc    Get order by ID (Guest & Logged-in user)
-// @route   GET /api/orders/:id
-// @access  Public
 // @desc    Get single order by ID (Guest & Logged-in user)
 // @route   GET /api/orders/:id
 // @access  Public

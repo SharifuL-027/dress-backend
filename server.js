@@ -12,6 +12,7 @@ import orderRoutes from './routes/orderRoutes.js';
 import bannerRoutes from './routes/bannerRoutes.js';
 import deliveryRoutes from './routes/deliveryRoutes.js';
 import promoRoutes from './routes/promoRoutes.js';
+import settingRoutes from "./routes/settingRoutes.js";
 
 
 // .env file load kora
@@ -55,6 +56,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/banners', bannerRoutes);
 app.use('/api/delivery', deliveryRoutes);
 app.use('/api/promo', promoRoutes);
+app.use("/api/settings", settingRoutes);
 
 // Server Start
 const PORT = process.env.PORT || 5000;

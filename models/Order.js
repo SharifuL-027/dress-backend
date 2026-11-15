@@ -27,6 +27,11 @@ const orderSchema = new mongoose.Schema({
     phone: { type: String, required: true },
     notes: { type: String, default: "" },
   },
+  advancePaid: {
+  type: Number,
+  required: true,
+  default: 0,
+},
 
   paymentMethod: { type: String, required: true, default: 'Cash on Delivery' },
   
