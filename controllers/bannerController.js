@@ -4,10 +4,12 @@ import Banner from '../models/Banner.js';
 // ১. নতুন ব্যানার তৈরি করা
 export const createBanner = async (req, res) => {
   try {
-    const { title, image, type, category, link } = req.body;
+    const { title, description, buttonText, image, type, category, link } = req.body;
 
     const banner = new Banner({
       title,
+      description: description || '',
+      buttonText: buttonText || 'Explore Collection',
       image,
       type,
       category: category ? category : null,
@@ -26,7 +28,7 @@ export const getBanners = async (req, res) => {
   try {
     const { type, category } = req.query;
     
-    // ফিল্টার লজিক (ফ্রন্টএন্ড থেকে কোয়েরি পাঠালে সেই অনুযায়ী ব্যানার আসবে)
+    // ফিল্টার লজিক (ফ্রন্টএন্ড থেকে কোয়েরি পাঠালে সেই অনুযায়ী ব্যানার আসবে)
     let query = {};
     if (type) query.type = type;
     if (category) query.category = category;
